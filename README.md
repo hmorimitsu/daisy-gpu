@@ -1,4 +1,4 @@
-# daisy-pytorch
+# daisy-gpu
 
 Implementation of the DAISY descriptor [[1]](#references) in GPU using deep learning libraries.
 Codes are provided for PyTorch, Tensorflow 1, and Tensorflow 2.
