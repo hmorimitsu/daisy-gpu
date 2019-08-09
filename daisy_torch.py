@@ -72,6 +72,8 @@ class DaisyTorch(object):
             following predicate since no radius is needed for the center
             histogram.
                 ``len(ring_radii) == len(sigmas) + 1``
+        fp16 : boolean : optional
+            If True, use half precision floting point tensors.
 
     References:
     [1] E. Tola; V. Lepetit; P. Fua : Daisy: An Efficient Dense Descriptor
@@ -86,7 +88,8 @@ class DaisyTorch(object):
                  orientations=8,
                  normalization='l1',
                  sigmas=None,
-                 ring_radii=None):
+                 ring_radii=None,
+                 fp16=False):
         self.step = step
         self.radius = radius
         self.rings = rings
@@ -95,6 +98,7 @@ class DaisyTorch(object):
         self.normalization = normalization
         self.sigmas = sigmas
         self.ring_radii = ring_radii
+        self.fp16 = fp16
 
         # Validate parameters.
         if sigmas is not None and ring_radii is not None \
@@ -125,7 +129,11 @@ class DaisyTorch(object):
         orientation_angles = [2 * o * np.pi / self.orientations - np.pi
                               for o in range(self.orientations)]
         self.orientation_angles = torch.from_numpy(
-            np.array(orientation_angles)[None, :, None, None]).float()
+            np.array(orientation_angles)[None, :, None, None])
+        if self.fp16:
+            self.orientation_angles = self.orientation_angles.half()
+        else:
+            self.orientation_angles = self.orientation_angles.float()
         if self.cuda:
             self.orientation_angles = self.orientation_angles.cuda()
 
@@ -160,7 +168,11 @@ class DaisyTorch(object):
         """
         start_time = time.time()
         images = np.stack(images, axis=0)[:, None]
-        images = torch.from_numpy(images).float() / 255.0
+        images = torch.from_numpy(images.astype(np.float32)) / 255.0
+        if self.fp16:
+            images = images.half()
+        else:
+            images = images.float()
         if self.cuda:
             images = images.cuda()
 
@@ -191,6 +203,10 @@ class DaisyTorch(object):
                       images.shape[3] - 2 * self.radius)
         if self.descs is None or self.descs.shape != desc_shape:
             self.descs = torch.empty(desc_shape)
+            if self.fp16:
+                self.descs = self.descs.half()
+            else:
+                self.descs = self.descs.float()
             if self.cuda:
                 self.descs = self.descs.cuda()
         self.descs[:, :self.orientations, :, :] = hist_smooth[
@@ -215,7 +231,10 @@ class DaisyTorch(object):
 
         # Normalize descriptors.
         if self.normalization != 'off':
-            descs += 1e-10
+            if self.fp16:
+                descs += 1e-3
+            else:
+                descs += 1e-10
             if self.normalization == 'l1':
                 descs /= torch.sum(descs, dim=3, keepdim=True)
             elif self.normalization == 'l2':
@@ -296,6 +315,12 @@ class DaisyTorch(object):
                 gy[j*len(sigmas) + i, j*len(sigmas) + i, :, 0] = k
         gx = torch.from_numpy(gx)
         gy = torch.from_numpy(gy)
+        if self.fp16:
+            gx = gx.half()
+            gy = gy.half()
+        else:
+            gx = gx.float()
+            gy = gy.float()
         if self.cuda:
             gx = gx.cuda()
             gy = gy.cuda()
