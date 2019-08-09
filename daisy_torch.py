@@ -143,6 +143,7 @@ class DaisyTorch(object):
         self.dx = None
         self.dy = None
         self.descs = None
+        self.max_batch_size = 1
 
     def extract_descriptor(self,
                            images):
@@ -176,17 +177,36 @@ class DaisyTorch(object):
         if self.cuda:
             images = images.cuda()
 
-        if self.dx is None or self.dx.shape != images.shape:
-            self.dx = torch.zeros_like(images)
-        if self.dy is None or self.dy.shape != images.shape:
-            self.dy = torch.zeros_like(images)
-        self.dx[:, :, :, :-1] = images[:, :, :, 1:] - images[:, :, :, :-1]
-        self.dy[:, :, :-1, :] = images[:, :, 1:, :] - images[:, :, :-1, :]
+        self.batch_size = images.shape[0]
+        self.max_batch_size = max(self.max_batch_size, self.batch_size)
+
+        if (self.dx is None or self.dx.shape[0] < self.max_batch_size or
+                self.dx.shape[2] != images.shape[2] or
+                self.dx.shape[3] != images.shape[3]):
+            shape = (self.max_batch_size,) + images.shape[1:]
+            self.dx = torch.zeros(shape)
+            if self.fp16:
+                self.dx = self.dx.half()
+            else:
+                self.dx = self.dx.float()
+            if self.cuda:
+                self.dx = self.dx.cuda()
+            self.dy = torch.zeros(shape)
+            if self.fp16:
+                self.dy = self.dy.half()
+            else:
+                self.dy = self.dy.float()
+            if self.cuda:
+                self.dy = self.dy.cuda()
+        dx = self.dx[:self.batch_size]
+        dx[:, :, :, :-1] = (images[:, :, :, 1:] - images[:, :, :, :-1])
+        dy = self.dy[:self.batch_size]
+        dy[:, :, :-1, :] = (images[:, :, 1:, :] - images[:, :, :-1, :])
 
         # Compute gradient orientation and magnitude and their contribution
         # to the histograms.
-        grad_mag = torch.sqrt(self.dx ** 2 + self.dy ** 2)
-        grad_ori = torch.atan2(self.dy, self.dx)
+        grad_mag = torch.sqrt(dx ** 2 + dy ** 2)
+        grad_ori = torch.atan2(dy, dx)
         hist = torch.exp(self.orientation_kappa * torch.cos(
             grad_ori - self.orientation_angles))
         hist *= grad_mag
@@ -198,7 +218,7 @@ class DaisyTorch(object):
         theta = np.array([2 * np.pi * j / self.histograms
                           for j in range(self.histograms)])
         desc_dims = (self.rings * self.histograms + 1) * self.orientations
-        desc_shape = (hist_smooth.shape[0], desc_dims,
+        desc_shape = (self.max_batch_size, desc_dims,
                       images.shape[2] - 2 * self.radius,
                       images.shape[3] - 2 * self.radius)
         if self.descs is None or self.descs.shape != desc_shape:
@@ -209,7 +229,8 @@ class DaisyTorch(object):
                 self.descs = self.descs.float()
             if self.cuda:
                 self.descs = self.descs.cuda()
-        self.descs[:, :self.orientations, :, :] = hist_smooth[
+        descs = self.descs[:self.batch_size]
+        descs[:, :self.orientations, :, :] = hist_smooth[
             :, 0, :, self.radius:-self.radius, self.radius:-self.radius]
         idx = self.orientations
         cos_theta = np.cos(theta)
@@ -218,15 +239,15 @@ class DaisyTorch(object):
             for j in range(self.histograms):
                 y_min = self.radius + int(round(
                     self.ring_radii[i] * sin_theta[j]))
-                y_max = self.descs.shape[2] + y_min
+                y_max = descs.shape[2] + y_min
                 x_min = self.radius + int(round(
                     self.ring_radii[i] * cos_theta[j]))
-                x_max = self.descs.shape[3] + x_min
+                x_max = descs.shape[3] + x_min
                 # print(i, j, y_min, y_max, x_min, x_max)
-                self.descs[:, idx:idx + self.orientations, :, :] = hist_smooth[
+                descs[:, idx:idx + self.orientations, :, :] = hist_smooth[
                     :, i + 1, :, y_min:y_max, x_min:x_max]
                 idx += self.orientations
-        descs = self.descs[:, :, ::self.step, ::self.step]
+        descs = descs[:, :, ::self.step, ::self.step]
         descs = descs.permute(0, 2, 3, 1)
 
         # Normalize descriptors.
