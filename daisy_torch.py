@@ -89,7 +89,8 @@ class DaisyTorch(object):
                  normalization='l1',
                  sigmas=None,
                  ring_radii=None,
-                 fp16=False):
+                 fp16=False,
+                 return_numpy=False):
         self.step = step
         self.radius = radius
         self.rings = rings
@@ -99,6 +100,7 @@ class DaisyTorch(object):
         self.sigmas = sigmas
         self.ring_radii = ring_radii
         self.fp16 = fp16
+        self.return_numpy = return_numpy
 
         # Validate parameters.
         if sigmas is not None and ring_radii is not None \
@@ -161,11 +163,11 @@ class DaisyTorch(object):
             (This explanation below is modified from scikit-image).
             descs : 4D array of floats
                 Grid of DAISY descriptors for the given image as an array
-                dimensionality  (N, P, Q, R) where
+                dimensionality  (N, R, P, Q) where
                 ``N = len(images)``
+                ``R = (rings * histograms + 1) * orientations``
                 ``P = ceil((M - radius*2) / step)``
                 ``Q = ceil((N - radius*2) / step)``
-                ``R = (rings * histograms + 1) * orientations``
         """
         start_time = time.time()
         images = np.stack(images, axis=0)[:, None]
@@ -248,7 +250,6 @@ class DaisyTorch(object):
                     :, i + 1, :, y_min:y_max, x_min:x_max]
                 idx += self.orientations
         descs = descs[:, :, ::self.step, ::self.step]
-        descs = descs.permute(0, 2, 3, 1)
 
         # Normalize descriptors.
         if self.normalization != 'off':
@@ -257,20 +258,24 @@ class DaisyTorch(object):
             else:
                 descs += 1e-10
             if self.normalization == 'l1':
-                descs /= torch.sum(descs, dim=3, keepdim=True)
+                descs /= torch.sum(descs, dim=1, keepdim=True)
             elif self.normalization == 'l2':
                 descs /= torch.sqrt(torch.sum(
-                    torch.pow(descs, 2), dim=3, keepdim=True))
+                    torch.pow(descs, 2), dim=1, keepdim=True))
             elif self.normalization == 'daisy':
                 for i in range(0, desc_dims, self.orientations):
                     norms = torch.sqrt(torch.sum(
-                        torch.pow(descs[:, :, :, i:i + self.orientations], 2),
-                        dim=3, keepdim=True))
-                    descs[:, :, :, i:i + self.orientations] /= norms
+                        torch.pow(descs[:, i:i + self.orientations], 2),
+                        dim=1, keepdim=True))
+                    descs[:, i:i + self.orientations] /= norms
+
+        if self.return_numpy:
+            descs = descs.detach().cpu().numpy()
+            
         end_time = time.time()
         print('total time: {:.1f} ms'.format(1000.0 * (end_time - start_time)))
 
-        return descs.detach().cpu().numpy()
+        return descs
 
     def _compute_one_gaussian_kernel(self,
                                      length,
