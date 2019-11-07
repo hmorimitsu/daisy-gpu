@@ -1,6 +1,6 @@
 # daisy-gpu
 
-Implementation of the DAISY descriptor [[1]](#references) in GPU using deep learning libraries.
+Implementation of the DAISY descriptor [[1]](#references) on GPU using deep learning libraries.
 Codes are provided for PyTorch, Tensorflow 1, and Tensorflow 2.
 
 This implementation is based on and borrows some
@@ -13,6 +13,8 @@ allocation of the space for the descriptors on the GPU. However, this step
 is only performed when the shape of the input batch changes. Subsequent
 calls using batches with the same shape as before will reuse the memory and
 will, therefore, be much faster.
+
+Code for SIFT Flow descriptors on GPU is also available at [https://github.com/hmorimitsu/sift-flow-gpu](https://github.com/hmorimitsu/sift-flow-gpu).
 
 ## Requirements
 
@@ -30,6 +32,8 @@ will, therefore, be much faster.
 ## Usage
 
 ### PyTorch version
+
+A simple example is shown below. A more complete practical usage is available as a [Jupyter demo notebook](demo_notebook_torch.ipynb)
 
 ```python
 from daisy_torch import DaisyTorch
@@ -119,9 +123,9 @@ Batch Size|PyTorch<br />Time CPU(ms)|PyTorch<br />Time GPU(ms)<sup>1</sup>|TF2<b
 4|1973.1|5.1|4.1|127.2| 77.2|114.2
 8|3042.5|8.9|6.4|250.8|151.4|227.1
 
-<sup>1</sup> NOT including time to transfer result from GPU to CPU
+<sup>1</sup> NOT including time to transfer the result from GPU to CPU
 
-<sup>2</sup> Including time to transfer result from GPU to CPU
+<sup>2</sup> Including time to transfer the result from GPU to CPU
 
 These times are the median of 5 runs measured after a warm up run to allocate the descriptor space in memory
 (read the [introduction](#daisy-pytorch)).
