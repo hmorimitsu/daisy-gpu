@@ -1,5 +1,4 @@
 import numpy as np
-import time
 import torch
 import torch.nn.functional as F
 
@@ -169,7 +168,6 @@ class DaisyTorch(object):
                 ``P = ceil((M - radius*2) / step)``
                 ``Q = ceil((N - radius*2) / step)``
         """
-        start_time = time.time()
         images = np.stack(images, axis=0)[:, None]
         images = torch.from_numpy(images.astype(np.float32)) / 255.0
         if self.fp16:
@@ -271,9 +269,6 @@ class DaisyTorch(object):
 
         if self.return_numpy:
             descs = descs.detach().cpu().numpy()
-            
-        end_time = time.time()
-        print('total time: {:.1f} ms'.format(1000.0 * (end_time - start_time)))
 
         return descs
 
