@@ -25,9 +25,9 @@ Code for SIFT Flow descriptors on GPU is also available at [https://github.com/h
 
 ### Deep learning libraries
 
-- [PyTorch](https://pytorch.org/) >= 1.0.0 (Tested on 1.1.0) **or**
+- [PyTorch](https://pytorch.org/) >= 1.0.0 (Tested on 1.4.0) **or**
 - [Tensorflow 1.X](https://www.tensorflow.org/) (Tested on 1.14) **or**
-- [Tensorflow 2.X](https://www.tensorflow.org/) (Tested on 2.0.0-beta1)
+- [Tensorflow 2.X](https://www.tensorflow.org/) (Tested on 2.1.0)
 
 ## Usage
 
@@ -110,18 +110,21 @@ descs2 = daisy.extract_descriptor(imgs2) # Subsequent calls are faster,
 
 ## Benchmark
 
+**Update:** The times reported previously were incorrect, because they were being computed without synchronizing the GPU.
+The table below was updated with the corrected values.
+
 - Machine configuration:
   - Intel i7 8750H
   - NVIDIA GeForce GTX1070
   - Images 1024 x 436
   - Descriptor size 200
 
-Batch Size|PyTorch<br />Time CPU(ms)|PyTorch<br />Time GPU(ms)<sup>1</sup>|TF2<br />Time GPU(ms)<sup>1</sup>|PyTorch<br />Time GPU(ms)<sup>2</sup>|TF1<br />Time GPU(ms)<sup>2</sup>|TF2<br />Time GPU(ms)<sup>2</sup>
--|------|---|---|-----|-----|-----
-1| 428.8|2.4|1.5| 35.5| 21.0| 32.5
-2| 786.5|3.2|2.7| 68.4| 39.8| 58.0
-4|1973.1|5.1|4.1|127.2| 77.2|114.2
-8|3042.5|8.9|6.4|250.8|151.4|227.1
+Batch Size|PyTorch<br />Time CPU(ms)|PyTorch<br />Time GPU(ms)<sup>1</sup>|PyTorch FP16<br />Time GPU(ms)<sup>1</sup>|TF2<br />Time GPU(ms)<sup>1</sup>|PyTorch<br />Time GPU(ms)<sup>2</sup>|TF1<br />Time GPU(ms)<sup>2</sup>|TF2<br />Time GPU(ms)<sup>2</sup>
+-|------|-----|-----|-----|-----|-----|-----
+1| 309.8| 27.9| 25.0| 21.3| 37.9| 26.5| 31.6
+2| 534.9| 39.8| 34.8| 38.0| 57.1| 48.2| 63.4
+4| 998.3| 79.6| 67.1| 75.3|113.5| 92.6|123.6
+8|2009.8|158.3|134.9|150.4|226.4|187.0|251.1
 
 <sup>1</sup> NOT including time to transfer the result from GPU to CPU
 
